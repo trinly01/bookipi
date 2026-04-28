@@ -1677,6 +1677,79 @@ When cancellation occurs:
 
 ---
 
+### Q51: Can you walk me through the entire purchase flow from user click to response?
+
+**A:** Absolutely. Here is the complete step-by-step data flow:
+
+**1. Frontend Action**
+- User enters `userId` and clicks "Buy Now".
+- React calls `saleAPI.purchase(userId)` → `POST /api/sale/purchase` with JSON body.
+
+**2. Request Enters Express Middleware Pipeline**
+- **Helmet**: Adds security headers (XSS, clickjacking protection).
+- **CORS**: Allows cross-origin requests from the React frontend.
+- **Rate Limiter**: Checks IP-based sliding window. If limit exceeded (10 per 15 min), returns `429 Too Many Requests` immediately.
+- **Redis Initializer**: Ensures Redis connection is established (singleton).
+
+**3. Controller (`saleController.attemptPurchase`)**
+- Extracts `userId` from request body.
+- Basic validation: non-empty string. If invalid → `400 Bad Request`.
+- Delegates to `FlashSaleService.attemptPurchase(userId)`.
+
+**4. Service Business Logic (`FlashSaleService`)**
+- **Time validation**: Confirms current time is within `[startTime, endTime]`. If not → `400`.
+- **Duplicate purchase check**: `EXISTS flashsale:purchase:{userId}`. If exists → `400` (already purchased).
+- **Atomic stock reservation** (critical step):
+  - Executes a **Lua script** in Redis:
+    ```lua
+    local stock = redis.call('GET', 'flashsale:stock:prod_001')
+    if not stock or tonumber(stock) <= 0 then return -1 end
+    redis.call('DECR', 'flashsale:stock:prod_001')
+    redis.call('SET', 'flashsale:purchase:' .. ARGV[1], '1')
+    return tonumber(stock) - 1
+    ```
+  - Redis runs this **atomically** (single-threaded, no interleaving). This prevents race conditions.
+- **Interpret result**:
+  - `-1` → sold out (stock was 0).
+  - `-2` → system error (stock key missing).
+  - `>= 0` → success; remaining stock = result.
+
+**5. Success Path – Order Creation**
+- Generate `orderId` (UUID).
+- Store order hash: `HMSET flashsale:order:{orderId} userId productId status 'completed' createdAt`.
+- Set TTL on keys to expire after sale ends.
+- Return `{success: true, orderId, purchasedAt}` to controller.
+
+**6. Error Path – Early Return**
+- If any check fails (time, duplicate, sold out) → return error object `{success:false, message}`.
+- Controller maps this to HTTP `400`.
+
+**7. Controller Sends HTTP Response**
+- Success: `200 OK` with order details.
+- Client errors: `400` with message.
+- Rate limited: `429`.
+- Server error: `500`.
+
+**8. Frontend Updates UI**
+- Polling (`useEffect` every 5s) calls `/api/sale/info` to refresh displayed stock and status.
+- Success shows order ID; errors display friendly messages.
+- Countdown timer updates every second independently.
+
+**Concurrency Guarantee**
+With 10,000 simultaneous requests:
+- Redis processes each Lua script **sequentially**.
+- Each script reads the **current** stock (after previous decrements).
+- Exactly `initialStock` succeed; all others receive "sold out".
+- No overselling, no duplicate purchases.
+
+**Key Redis Keys**
+```
+flashsale:stock:prod_001      → String (remaining count)
+flashsale:purchase:{userId}   → String (flag, existence = purchased)
+flashsale:order:{orderId}     → Hash (order details)
+```
+All keys have TTL = sale end time for automatic cleanup.
+
 ## Quick Reference
 
 ### Key Files & Responsibilities
