@@ -1,16 +1,15 @@
 import request from 'supertest';
 import app from '../src/index';
-import { getRedisClient, closeRedis } from '../src/config/redis';
-import { initializeRedis } from '../src/config/redis';
+import { getRedisClient, closeRedis, initializeRedis, RedisClientType } from '../src/config/redis';
 
 describe('Flash Sale API Integration Tests', () => {
-  let redisClient;
+  let redisClient: RedisClientType;
 
   beforeAll(async () => {
     // Initialize Redis connection
     redisClient = await initializeRedis();
     // Clear any existing test data
-    await redisClient.flushdb();
+    await redisClient.flushDb();
   });
 
   afterAll(async () => {
@@ -19,7 +18,7 @@ describe('Flash Sale API Integration Tests', () => {
 
   beforeEach(async () => {
     // Clear database before each test
-    await redisClient.flushdb();
+    await redisClient.flushDb();
     // Reinitialize stock for product
     await redisClient.set('flashsale:stock:prod_001', '3');
   });

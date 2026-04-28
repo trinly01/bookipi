@@ -50,10 +50,12 @@ app.get('/health', (req, res) => {
 // Error handling
 app.use(errorHandler);
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Flash Sale API server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+// Start server only when not in test mode
+if (process.env.NODE_ENV !== 'test' && require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Flash Sale API server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+}
 
 export default app;

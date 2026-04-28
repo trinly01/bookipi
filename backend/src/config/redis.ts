@@ -5,6 +5,8 @@ dotenv.config();
 
 let redisClient: RedisClientType;
 
+export { RedisClientType };
+
 export const initializeRedis = async (): Promise<RedisClientType> => {
   if (redisClient && redisClient.isOpen) {
     return redisClient;

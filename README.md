@@ -225,6 +225,7 @@ flash-sale-platform/
    ```bash
    cd frontend
    npm install
+   # Testing dependencies included: vitest, @testing-library/react, @testing-library/jest-dom, jsdom
    cd ..
    ```
 
@@ -296,15 +297,31 @@ npm run test:coverage
 **Test Coverage:**
 - Unit tests for FlashSaleService (mocked Redis)
 - Integration tests for API endpoints (real Redis)
+- Stress tests for high-load scenarios
 - All tests run with an isolated Redis test database (flushed before each test)
 
 ### Frontend Tests
 
 ```bash
 cd frontend
-npm test          # Run once
-npm run test:watch  # Watch mode
+
+# Install dependencies (includes vitest, @testing-library/react, @testing-library/jest-dom, jsdom)
+npm install
+
+# Run all tests once
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
 ```
+
+**Test Coverage:**
+- Component tests for React UI components (SaleStatusCard, PurchaseForm, PurchaseResult, PurchaseHistory)
+- Tests use React Testing Library and Vitest
+- jsdom environment simulates browser DOM
 
 ## Stress Testing
 

@@ -10,7 +10,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "stress": "ts-node tests/stress.test.ts"
+    "stress": "ts-node tests/stress-runner.ts"
   },
   "keywords": ["flash-sale", "api", "nodejs"],
   "author": "",
