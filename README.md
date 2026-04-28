@@ -660,6 +660,42 @@ MAX_PURCHASE_PER_USER=1
 - Allow at least 5-10 minutes for stress testing
 
 ## Troubleshooting
+
+### Remaining Stock Shows Unexpected Value
+
+If `GET /api/sale/status` returns a `remainingStock` that doesn't match your `INITIAL_STOCK` setting:
+
+**Cause:** Redis retains previous sale data. The `FlashSaleService` only initializes stock if the key doesn't exist (`SETNX`). Existing keys are never overwritten.
+
+**Reset to initial stock:**
+```bash
+# Option 1: Clear entire Redis database (removes all data)
+docker exec flashsale-redis redis-cli FLUSHDB
+
+# Option 2: Delete only the stock key (preserves user purchase/order data)
+docker exec flashsale-redis redis-cli DEL flashsale:stock:prod_001
+```
+
+**Then restart your backend** to reinitialize with the current `INITIAL_STOCK` value from `.env`:
+```bash
+cd backend
+npm run dev  # or restart your server
+```
+
+**Verify reset:**
+```bash
+# Check Redis directly
+docker exec flashsale-redis redis-cli GET flashsale:stock:prod_001
+
+# Or via API
+curl http://localhost:3000/api/sale/status
+```
+
+**Configure initial stock:**
+Edit `backend/.env`:
+```bash
+INITIAL_STOCK=200  # Set your desired starting quantity
+```
 ```bash
 # Check Redis is running
 docker-compose ps
@@ -699,6 +735,8 @@ curl http://localhost:3000/health
 ```bash
 # Clear Redis test data manually
 docker-compose exec redis redis-cli FLUSHDB
+# OR use container name directly
+docker exec flashsale-redis redis-cli FLUSHDB
 
 # Re-run with verbose output
 cd backend
@@ -745,7 +783,7 @@ npm install --prefix frontend
 | Frontend build | `npm run build` | `frontend/` |
 | Frontend preview | `npm run preview` | `frontend/` |
 | Frontend test | `npm test` | `frontend/` |
-| Clear Redis DB | `docker-compose exec redis redis-cli FLUSHDB` | Project root |
+| Clear Redis DB | `docker-compose exec redis redis-cli FLUSHDB` <br> `docker exec flashsale-redis redis-cli FLUSHDB` | Project root |
 | Check backend health | `curl http://localhost:3000/health` | Anywhere |
 | View Redis logs | `docker-compose logs -f redis` | Project root |
 
